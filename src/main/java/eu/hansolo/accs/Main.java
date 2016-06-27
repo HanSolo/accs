@@ -28,14 +28,30 @@ import java.util.Optional;
  * Created by hansolo on 15.06.16.
  */
 public class Main {
-    private static final String[][]       UMLAUT_REPLACEMENTS = { { new String("Ä"), "Ae" },
-                                                                  { new String("Ü"), "Ue" },
-                                                                  { new String("Ö"), "Oe" },
-                                                                  { new String("ä"), "ae" },
-                                                                  { new String("ü"), "ue" },
-                                                                  { new String("ö"), "oe" },
-                                                                  { new String("ß"), "ss" } };
     private static final Optional<String> PORT                = Optional.ofNullable(System.getenv("PORT"));
+    private enum UMLAUT {
+        Ae("\u00C4", "Ae"),
+        Ue("\u00DC", "Ue"),
+        Oe("\u00D6", "Oe"),
+        ae("\u00E4", "ae"),
+        ue("\u00FC", "ue"),
+        oe("\u00F6", "oe"),
+        sz("\u00DF", "ss");
+
+        public final String ORIGINAL;
+        public final String REPLACEMENT;
+
+        UMLAUT(final String ORIGINAL, final String REPLACEMENT) {
+            this.ORIGINAL    = ORIGINAL;
+            this.REPLACEMENT = REPLACEMENT;
+        }
+
+        public static String replaceUmlauts(final String WORD) {
+            String tmp = WORD;
+            for(UMLAUT umlaut : values()) { tmp = tmp.replaceAll(umlaut.ORIGINAL, umlaut.REPLACEMENT); }
+            return tmp;
+        }
+    }
 
 
     // ******************** Constructors **************************************
@@ -104,9 +120,29 @@ public class Main {
     }
 
     private JSONObject updateLocation(final Location LOCATION) {
-        LOCATION.info = updateInfo(LOCATION);
-        RestClient.INSTANCE.putLocation(LOCATION);
+        //LOCATION.info = updateInfo(LOCATION);
+        RestClient.INSTANCE.putLocation(updateLocationInfo(LOCATION));
         return LOCATION.toJSON();
+    }
+
+    private Location updateLocationInfo(final Location LOCATION) {
+        JSONObject   json   = RestClient.INSTANCE.getAddress(LOCATION.latitude, LOCATION.longitude);
+        final String STATUS = json.get("status").toString();
+        if (STATUS.equals("OK")) {
+            JSONArray  results           = (JSONArray) json.get("results");
+            JSONObject addressComponents = (JSONObject) results.get(0);
+            String[]   formattedAddress  = addressComponents.get("formatted_address").toString().split(",");
+            int        length            = formattedAddress.length;
+            if (length > 2) {
+                String city    = UMLAUT.replaceUmlauts(formattedAddress[length - 2].trim().replaceAll("\\P{L}+", ""));
+                String country = formattedAddress[length - 1].trim();
+                LOCATION.info  = String.join("", city, ", ", country);
+                return LOCATION;
+            }
+        } else {
+            return LOCATION;
+        }
+        return LOCATION;
     }
 
     private String updateInfo(final Location LOCATION) {
@@ -120,7 +156,7 @@ public class Main {
             String[]   formattedAddress  = addressComponents.get("formatted_address").toString().split(",");
             int        length            = formattedAddress.length;
             if (length > 2) {
-                String city    = replaceUmlauts(formattedAddress[length - 2].trim().replaceAll("\\P{L}+", ""));
+                String city    = UMLAUT.replaceUmlauts(formattedAddress[length - 2].trim().replaceAll("\\P{L}+", ""));
                 String country = formattedAddress[length - 1].trim();
                 return String.join("", city, ", ", country);
             }
@@ -128,12 +164,6 @@ public class Main {
             return "";
         }
         return "";
-    }
-
-    public static String replaceUmlauts(final String ORIGINAL) {
-        String result = ORIGINAL;
-        for (int i = 0; i < UMLAUT_REPLACEMENTS.length; i++) { result = result.replace(UMLAUT_REPLACEMENTS[i][0], UMLAUT_REPLACEMENTS[i][1]); }
-        return result;
     }
 
     public static void main(String[] args) { new Main(); }
