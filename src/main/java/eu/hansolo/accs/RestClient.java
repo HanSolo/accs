@@ -17,13 +17,14 @@
 package eu.hansolo.accs;
 
 import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -61,13 +62,11 @@ public enum RestClient {
     }
 
     private static final   String MLAB_API_KEY = API_KEY.isPresent() ? API_KEY.get() : "";
-    private HttpClient     httpClient;
     private List<Location> locationList;
 
 
     // ******************** Constructors **************************************
     RestClient() {
-        httpClient   = HttpClientBuilder.create().build();
         locationList = new ArrayList<>(64);
     }
 
@@ -135,27 +134,21 @@ public enum RestClient {
     }
 
     public JSONObject getAddress(final double LATITUDE, final double LONGITUDE) {
-        try {
+        try(CloseableHttpClient httpClient = HttpClientBuilder.create().build()) {
             HttpGet get = new HttpGet("http://maps.google.com/maps/api/geocode/json?latlng=" + LATITUDE + "," + LONGITUDE + "&sensor=false");
             get.addHeader("accept", "application/json");
 
-            HttpResponse response = httpClient.execute(get);
+            CloseableHttpResponse response = httpClient.execute(get);
             int statusCode = response.getStatusLine().getStatusCode();
             if (statusCode != 200) {
                 //throw new RuntimeException("Failed: HTTP error code: " + statusCode);
                 return new JSONObject();
             }
 
-            StringBuilder       output = new StringBuilder();
-            try (BufferedReader br     = new BufferedReader(new InputStreamReader(response.getEntity().getContent()))) {
-                String line;
-                while ((line = br.readLine()) != null) { output.append(line); }
-            } catch (IOException exception) {
-                System.out.println("Error: " + exception);
-            }
-            JSONObject jsonObject = (JSONObject) JSONValue.parse(output.toString());
+            String     output     = getFromResponse(response);
+            JSONObject jsonObject = (JSONObject) JSONValue.parse(output);
             return jsonObject;
-        } catch (IOException exception) {
+        } catch (IOException e) {
             return new JSONObject();
         }
     }
@@ -171,9 +164,8 @@ public enum RestClient {
         }
     }
 
-
     private JSONArray getAll(final DbCollection COLLECTION) {
-        try {
+        try(CloseableHttpClient httpClient = HttpClientBuilder.create().build()) {
             URIBuilder builder = new URIBuilder();
             builder.setScheme("http")
                    .setHost("api.mlab.com")
@@ -183,116 +175,103 @@ public enum RestClient {
             HttpGet get = new HttpGet(builder.build());
             get.setHeader("accept", "application/json");
 
-            HttpResponse response = httpClient.execute(get);
+            CloseableHttpResponse response = httpClient.execute(get);
             int statusCode = response.getStatusLine().getStatusCode();
             if (statusCode != 200) {
                 //throw new RuntimeException("Failed: HTTP error code: " + statusCode);
                 return new JSONArray();
             }
 
-            StringBuilder output = new StringBuilder();
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(response.getEntity().getContent()))) {
-                String line;
-                while ((line = br.readLine()) != null) { output.append(line); }
-            } catch (IOException exception) {
-                System.out.println("Error: " + exception);
-            }
-            JSONArray jsonArray = (JSONArray) JSONValue.parse(output.toString());
+            String    output    = getFromResponse(response);
+            JSONArray jsonArray = (JSONArray) JSONValue.parse(output);
             return jsonArray;
-        } catch (IOException | URISyntaxException exception) {
-            System.out.println("Error: " + exception);
+        } catch (URISyntaxException | IOException e) {
             return new JSONArray();
         }
     }
 
     private JSONObject getSpecificObject(final URIBuilder BUILDER) {
-        try {
+        try(CloseableHttpClient httpClient = HttpClientBuilder.create().build()) {
             HttpGet get = new HttpGet(BUILDER.build());
 
-            HttpResponse response = httpClient.execute(get);
+            CloseableHttpResponse response = httpClient.execute(get);
             int statusCode = response.getStatusLine().getStatusCode();
             if (statusCode != 200) {
                 //throw new RuntimeException("Failed: HTTP error code: " + statusCode);
                 return new JSONObject();
             }
 
-            StringBuilder       output = new StringBuilder();
-            try (BufferedReader br     = new BufferedReader(new InputStreamReader(response.getEntity().getContent()))) {
-                String line;
-                while ((line = br.readLine()) != null) { output.append(line); }
-            } catch(IOException exception) {
-                System.out.println("Error: " + exception);
-            }
-            JSONArray  jsonArray  = (JSONArray) JSONValue.parse(output.toString());
+            String     output     = getFromResponse(response);
+            JSONArray  jsonArray  = (JSONArray) JSONValue.parse(output);
             JSONObject jsonObject = jsonArray.size() > 0 ? (JSONObject) jsonArray.get(0) : new JSONObject();
             return jsonObject;
-        } catch (IOException | URISyntaxException exception) {
-            System.out.println("Error: " + exception);
+        } catch (URISyntaxException | IOException e) {
             return new JSONObject();
         }
     }
     private JSONArray getSpecificArray(final URIBuilder BUILDER) {
-        try {
+        try(CloseableHttpClient httpClient = HttpClientBuilder.create().build()) {
             HttpGet get = new HttpGet(BUILDER.build());
 
-            HttpResponse response = httpClient.execute(get);
+            CloseableHttpResponse response = httpClient.execute(get);
             int statusCode = response.getStatusLine().getStatusCode();
             if (statusCode != 200) {
                 //throw new RuntimeException("Failed: HTTP error code: " + statusCode);
                 return new JSONArray();
             }
 
-            StringBuilder       output = new StringBuilder();
-            try (BufferedReader br     = new BufferedReader(new InputStreamReader(response.getEntity().getContent()))) {
-                String line;
-                while ((line = br.readLine()) != null) { output.append(line); }
-            } catch(IOException exception) {
-                System.out.println("Error: " + exception);
-            }
-            JSONArray jsonArray = (JSONArray) JSONValue.parse(output.toString());
+            String    output    = getFromResponse(response);
+            JSONArray jsonArray = (JSONArray) JSONValue.parse(output);
             return jsonArray;
-        } catch (IOException | URISyntaxException exception) {
-            System.out.println("Error: " + exception);
+        } catch (URISyntaxException | IOException e) {
             return new JSONArray();
         }
     }
     private JSONObject postSpecific(final URIBuilder BUILDER, final Location LOCATION) {
-        try {
+        try(CloseableHttpClient httpClient = HttpClientBuilder.create().build()) {
             HttpPost post = new HttpPost(BUILDER.build());
             post.setHeader("Content-type", "application/json");
             post.setHeader("accept", "application/json");
             post.setEntity(new StringEntity(LOCATION.toJSONString()));
 
             return handleResponse(httpClient.execute(post));
-        } catch (IOException | URISyntaxException exception) {
-            System.out.println("Error: " + exception);
+        } catch (URISyntaxException | IOException e) {
             return new JSONObject();
         }
     }
     private JSONObject putSpecific(final URIBuilder BUILDER, final Location LOCATION) {
-        try {
+        try(CloseableHttpClient httpClient = HttpClientBuilder.create().build()) {
             HttpPut put = new HttpPut(BUILDER.build());
             put.setHeader("Content-type", "application/json");
             put.setHeader("accept", "application/json");
             put.setEntity(new StringEntity(LOCATION.toJSONString()));
 
             return handleResponse(httpClient.execute(put));
-        } catch (IOException | URISyntaxException exception) {
-            System.out.println("Error: " + exception);
+        } catch (URISyntaxException | IOException e) {
             return new JSONObject();
         }
     }
     private JSONObject deleteSpecific(final URIBuilder BUILDER) {
-        try {
+        try(CloseableHttpClient httpClient = HttpClientBuilder.create().build()) {
             HttpDelete delete = new HttpDelete(BUILDER.build());
             delete.setHeader("Content-type", "application/json");
             delete.setHeader("accept", "application/json");
 
             return handleResponse(httpClient.execute(delete));
-        } catch (IOException | URISyntaxException exception) {
-            System.out.println("Error: " + exception);
+        } catch (URISyntaxException | IOException e) {
             return new JSONObject();
         }
+    }
+
+    private String getFromResponse(final CloseableHttpResponse RESPONSE) {
+        final StringBuilder OUTPUT = new StringBuilder();
+        try (BufferedReader br     = new BufferedReader(new InputStreamReader(RESPONSE.getEntity().getContent()))) {
+            String line;
+            while ((line = br.readLine()) != null) { OUTPUT.append(line); }
+        } catch(IOException exception) {
+            System.out.println("Error: " + exception);
+        }
+        return OUTPUT.toString();
     }
 
     private JSONObject handleResponse(final HttpResponse RESPONSE) {

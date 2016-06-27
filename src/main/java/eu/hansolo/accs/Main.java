@@ -120,29 +120,9 @@ public class Main {
     }
 
     private JSONObject updateLocation(final Location LOCATION) {
-        //LOCATION.info = updateInfo(LOCATION);
-        RestClient.INSTANCE.putLocation(updateLocationInfo(LOCATION));
+        LOCATION.info = updateInfo(LOCATION);
+        RestClient.INSTANCE.putLocation(LOCATION);
         return LOCATION.toJSON();
-    }
-
-    private Location updateLocationInfo(final Location LOCATION) {
-        JSONObject   json   = RestClient.INSTANCE.getAddress(LOCATION.latitude, LOCATION.longitude);
-        final String STATUS = json.get("status").toString();
-        if (STATUS.equals("OK")) {
-            JSONArray  results           = (JSONArray) json.get("results");
-            JSONObject addressComponents = (JSONObject) results.get(0);
-            String[]   formattedAddress  = addressComponents.get("formatted_address").toString().split(",");
-            int        length            = formattedAddress.length;
-            if (length > 2) {
-                String city    = UMLAUT.replaceUmlauts(formattedAddress[length - 2].trim().replaceAll("\\P{L}+", ""));
-                String country = formattedAddress[length - 1].trim();
-                LOCATION.info  = String.join("", city, ", ", country);
-                return LOCATION;
-            }
-        } else {
-            return LOCATION;
-        }
-        return LOCATION;
     }
 
     private String updateInfo(final Location LOCATION) {
